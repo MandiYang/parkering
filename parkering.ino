@@ -1,13 +1,16 @@
 #include <U8g2lib.h>
 #include <Servo.h>
 #include <Adafruit_NeoPixel.h>
+#include "WiFiS3.h"
 #include "Arduino_LED_Matrix.h"
+#include "arduino_secrets.h" 
 #define PIN        9
 #define NUMPIXELS 24
 
 Adafruit_NeoPixel pixels(NUMPIXELS, PIN, NEO_GRB + NEO_KHZ800);
 U8G2_SSD1306_128X64_NONAME_1_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE);
 ArduinoLEDMatrix matrix;
+
 const int seekPin1 = 5;
 const int seekPin2 = 3;
 
@@ -18,6 +21,7 @@ int sensorIN;
 int sensorOUT;
 const int SERVO_PIN = 6;
 
+//Servobom
 const int OPEN_ANGLE = 0;
 const int CLOSED_ANGLE = 90;
 const int GATE_OPEN_TIME = 3000;
@@ -25,6 +29,14 @@ int GATE_TEMP_TIME = 0;
 bool bomArOppen = false;
 Servo bomServo;
 
+//Wifi server
+char ssid[] = SECRET_SSID;        // your network SSID (name)
+char pass[] = SECRET_PASS;    // your network password (use for WPA, or use as key for WEP)
+int keyIndex = 0;                 // your network key index number (needed only for WEP)
+
+int led =  10;
+int status = WL_IDLE_STATUS;
+WiFiServer server(80);
 
 void setup() {
   Serial.begin(9600);
@@ -40,12 +52,31 @@ void setup() {
   oledWrite(String(ledigaPlatser).c_str());
   updateLights();
   updateMatrix();
+  // check for the WiFi module:
+  if (WiFi.status() == WL_NO_MODULE) {
+    Serial.println("Communication with WiFi module failed!");
+    // don't continue
+    while (true);
+  }
+  // attempt to connect to WiFi network:
+  while (status != WL_CONNECTED) {
+    Serial.print("Attempting to connect to Network named: ");
+    Serial.println(ssid);                   // print the network name (SSID);
+
+    // Connect to WPA/WPA2 network. Change this line if using open or WEP network:
+    status = WiFi.begin(ssid, pass);
+    // wait 6 seconds for connection:
+    delay(6000);
+  }
+  server.begin();    // start the web server on port 80
+  printWifiStatus(); // you're connected now, so print out the status
 }
 
 void loop() {
   sensorIN = digitalRead(seekPin1);
   sensorOUT = digitalRead(seekPin2);
   direction = checkMovement(sensorIN, sensorOUT);
+  /*
   Serial.print(sensorIN);
   Serial.print("   ");
   Serial.print(sensorOUT);
@@ -53,6 +84,7 @@ void loop() {
   Serial.print(direction);
   Serial.print("   ");
   Serial.println(ledigaPlatser);
+  */
   updateLedigaplatser();
   bomAction();
 }
@@ -178,4 +210,24 @@ void updateMatrix() {
     }
   }
   matrix.renderBitmap(frame, 8, 12);
+}
+
+void printWifiStatus() {
+  // print the SSID of the network you're attached to:
+  Serial.print("SSID: ");
+  Serial.println(WiFi.SSID());
+
+  // print your board's IP address:
+  IPAddress ip = WiFi.localIP();
+  Serial.print("IP Address: ");
+  Serial.println(ip);
+
+  // print the received signal strength:
+  long rssi = WiFi.RSSI();
+  Serial.print("signal strength (RSSI):");
+  Serial.print(rssi);
+  Serial.println(" dBm");
+  // print where to go in a browser:
+  Serial.print("To see this page in action, open a browser to http://");
+  Serial.println(ip);
 }

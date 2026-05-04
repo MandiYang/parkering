@@ -1,5 +1,10 @@
 #include <U8g2lib.h>
 #include <Servo.h>
+#include <Adafruit_NeoPixel.h>
+#define PIN        9
+#define NUMPIXELS 24
+
+Adafruit_NeoPixel pixels(NUMPIXELS, PIN, NEO_GRB + NEO_KHZ800);
 U8G2_SSD1306_128X64_NONAME_1_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE);
 const int seekPin1 = 5;
 const int seekPin2 = 3;
@@ -21,6 +26,8 @@ Servo bomServo;
 
 void setup() {
   Serial.begin(9600);
+  pixels.begin();
+  pixels.setBrightness(50); // Sätt ljusstyrkan (0-255)
   bomServo.attach(SERVO_PIN);
   pinMode(seekPin1, INPUT);
   pinMode(seekPin2, INPUT);
@@ -28,6 +35,7 @@ void setup() {
   u8g2.setFont(u8g2_font_ncenB08_tr);
   bomServo.write(CLOSED_ANGLE);
   oledWrite(String(ledigaPlatser).c_str());
+  updateLights();
 }
 
 void loop() {
@@ -88,9 +96,11 @@ void updateLedigaplatser() {
   if ((direction == 1) && (ledigaPlatser > 0)) {  // IN
     ledigaPlatser--;
     oledWrite(String(ledigaPlatser).c_str());
+    updateLights();
   } else if ((direction == 2) && (ledigaPlatser < maxPlatser)) {  // UT
     ledigaPlatser++;
     oledWrite(String(ledigaPlatser).c_str());
+    updateLights();
   }
 }
 
@@ -128,4 +138,21 @@ void bomAction() {
     }
     bomArOppen = false;
   }*/
+}
+
+// Funktion för att styra färg baserat på lediga platser
+void updateLights() {
+  if (ledigaPlatser <= 0) {
+    setAllPixels(pixels.Color(255, 0, 0)); // RÖTT - Fullt
+  } else {
+    setAllPixels(pixels.Color(0, 255, 0)); // GRÖNT - Ledigt
+  }
+}
+
+// Hjälpfunktion för att sätta färg på alla pixlar
+void setAllPixels(uint32_t color) {
+  for(int i=0; i<NUMPIXELS; i++) {
+    pixels.setPixelColor(i, color);
+  }
+  pixels.show();
 }

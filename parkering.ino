@@ -1,11 +1,13 @@
 #include <U8g2lib.h>
 #include <Servo.h>
 #include <Adafruit_NeoPixel.h>
+#include "Arduino_LED_Matrix.h"
 #define PIN        9
 #define NUMPIXELS 24
 
 Adafruit_NeoPixel pixels(NUMPIXELS, PIN, NEO_GRB + NEO_KHZ800);
 U8G2_SSD1306_128X64_NONAME_1_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE);
+ArduinoLEDMatrix matrix;
 const int seekPin1 = 5;
 const int seekPin2 = 3;
 
@@ -26,6 +28,7 @@ Servo bomServo;
 
 void setup() {
   Serial.begin(9600);
+  matrix.begin();
   pixels.begin();
   pixels.setBrightness(50); // Sätt ljusstyrkan (0-255)
   bomServo.attach(SERVO_PIN);
@@ -36,6 +39,7 @@ void setup() {
   bomServo.write(CLOSED_ANGLE);
   oledWrite(String(ledigaPlatser).c_str());
   updateLights();
+  updateMatrix();
 }
 
 void loop() {
@@ -97,10 +101,12 @@ void updateLedigaplatser() {
     ledigaPlatser--;
     oledWrite(String(ledigaPlatser).c_str());
     updateLights();
+    updateMatrix();
   } else if ((direction == 2) && (ledigaPlatser < maxPlatser)) {  // UT
     ledigaPlatser++;
     oledWrite(String(ledigaPlatser).c_str());
     updateLights();
+    updateMatrix();
   }
 }
 
@@ -155,4 +161,21 @@ void setAllPixels(uint32_t color) {
     pixels.setPixelColor(i, color);
   }
   pixels.show();
+}
+
+// Funktion som ritar en pixel per ledig plats på den inbyggda matrisen
+void updateMatrix() {
+  // Matrisen på R4 är 8 rader hög och 12 kolumner bred
+  uint8_t frame[8][12] = {0}; 
+
+  int tanda = 0;
+  for (int r = 0; r < 8; r++) {
+    for (int c = 0; c < 12; c++) {
+      if (tanda < ledigaPlatser) {
+        frame[r][c] = 1; // Tänd denna pixel
+        tanda++;
+      }
+    }
+  }
+  matrix.renderBitmap(frame, 8, 12);
 }

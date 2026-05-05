@@ -37,6 +37,7 @@ int keyIndex = 0;                 // your network key index number (needed only 
 int led =  10;
 int status = WL_IDLE_STATUS;
 WiFiServer server(80);
+String displayMsg="Lediga platser: " + String(ledigaPlatser);
 
 void setup() {
   Serial.begin(9600);
@@ -49,7 +50,7 @@ void setup() {
   u8g2.begin();
   u8g2.setFont(u8g2_font_ncenB08_tr);
   bomServo.write(CLOSED_ANGLE);
-  oledWrite(String(ledigaPlatser).c_str());
+  oledWrite(displayMsg);
   updateLights();
   updateMatrix();
   // check for the WiFi module:
@@ -76,7 +77,7 @@ void loop() {
   sensorIN = digitalRead(seekPin1);
   sensorOUT = digitalRead(seekPin2);
   direction = checkMovement(sensorIN, sensorOUT);
-  /*
+  
   Serial.print(sensorIN);
   Serial.print("   ");
   Serial.print(sensorOUT);
@@ -84,9 +85,10 @@ void loop() {
   Serial.print(direction);
   Serial.print("   ");
   Serial.println(ledigaPlatser);
-  */
+  
   updateLedigaplatser();
   bomAction();
+  webServer();
 }
 
 // Returnerar: 0 = Ingen rörelse, 1 = IN, 2 = UT
@@ -95,9 +97,9 @@ int checkMovement(int seekIN, int seekOUT) {
   static unsigned long lastChange = 0;
   int result = 0;
 
-  // SÄKERHET: Nollställ om sensorerna är blockerade för länge (t.ex. 2 sekunder)
+  // SÄKERHET: Nollställ om sensorerna är blockerade för länge (t.ex. 60 sekunder)
   if (seekIN == LOW || seekOUT == LOW) {
-    if (millis() - lastChange > 2000) {
+    if (millis() - lastChange > 60000) {
       state = 0;
     }
   } else {
@@ -131,14 +133,16 @@ int checkMovement(int seekIN, int seekOUT) {
 void updateLedigaplatser() {
   if ((direction == 1) && (ledigaPlatser > 0)) {  // IN
     ledigaPlatser--;
-    oledWrite(String(ledigaPlatser).c_str());
-    updateLights();
+    displayMsg = "Lediga platser: " + String(ledigaPlatser);
+    oledWrite(displayMsg);
     updateMatrix();
+    updateLights();
   } else if ((direction == 2) && (ledigaPlatser < maxPlatser)) {  // UT
     ledigaPlatser++;
-    oledWrite(String(ledigaPlatser).c_str());
-    updateLights();
+    displayMsg = "Lediga platser: " + String(ledigaPlatser);
+    oledWrite(displayMsg);
     updateMatrix();
+    updateLights();
   }
 }
 
@@ -185,6 +189,14 @@ void updateLights() {
   } else {
     setAllPixels(pixels.Color(0, 255, 0)); // GRÖNT - Ledigt
   }
+  /*
+  if (bomArOppen) {
+    setAllPixels(pixels.Color(255, 165, 0)); // GULT - Bom öppen
+  } else if (ledigaPlatser <= 0) {
+    setAllPixels(pixels.Color(255, 0, 0)); // RÖTT - Fullt
+  } else {
+    setAllPixels(pixels.Color(0, 255, 0)); // GRÖNT - Ledigt
+  }*/
 }
 
 // Hjälpfunktion för att sätta färg på alla pixlar
@@ -230,4 +242,69 @@ void printWifiStatus() {
   // print where to go in a browser:
   Serial.print("To see this page in action, open a browser to http://");
   Serial.println(ip);
+}
+
+void webServer() {
+  WiFiClient client = server.available();   // listen for incoming clients
+
+  if (client) {                             // if you get a client,
+    Serial.println("new client");           // print a message out the serial port
+    String currentLine = "";                // make a String to hold incoming data from the client
+    while (client.connected()) {            // loop while the client's connected
+      if (client.available()) {             // if there's bytes to read from the client,
+        char c = client.read();             // read a byte, then
+        Serial.write(c);                    // print it out to the serial monitor
+        if (c == '\n') {                    // if the byte is a newline character
+
+          // if the current line is blank, you got two newline characters in a row.
+          // that's the end of the client HTTP request, so send a response:
+          if (currentLine.length() == 0) {
+            // HTTP headers always start with a response code (e.g. HTTP/1.1 200 OK)
+            // and a content-type so the client knows what's coming, then a blank line:
+            client.println("HTTP/1.1 200 OK");
+            client.println("Content-type:text/html");
+            client.println();
+
+            // the content of the HTTP response follows the header:
+            // FIXED
+            String htmlContent;
+            if (ledigaPlatser <= 0) {
+              htmlContent = "<html><head>"
+                  "<meta charset='UTF-8'>"
+                  "<meta http-equiv='refresh' content='3'>"
+                  "</head><body>"
+                  "<h1>Parkeringsplatser</h1>"
+                  "<p>Max antal platser: " + String(maxPlatser) + "</p>"
+                  "<p style='color:red;'><b>Parkeringen är full!</b></p>"
+                  "</body></html>";
+            } else {
+              htmlContent = "<html><head>"
+                  "<meta charset='UTF-8'>"
+                  "<meta http-equiv='refresh' content='3'>"
+                  "</head><body>"
+                  "<h1>Parkeringsplatser</h1>"
+                  "<p>Max antal platser: " + String(maxPlatser) + "</p>"
+                  "<p style='color:green;'>Lediga platser: " + String(ledigaPlatser) + "</p>"
+                  "</body></html>";
+            }
+            client.print(htmlContent);
+            
+            
+            // The HTTP response ends with another blank line:
+            client.println();
+            // break out of the while loop:
+            break;
+          } else {    // if you got a newline, then clear currentLine:
+            currentLine = "";
+          }
+        } else if (c != '\r') {  // if you got anything else but a carriage return character,
+          currentLine += c;      // add it to the end of the currentLine
+        }
+      }
+      
+    }
+    // close the connection:
+    client.stop();
+    Serial.println("client disconnected");
+  }
 }

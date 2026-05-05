@@ -45,8 +45,8 @@ void setup() {
   pixels.begin();
   pixels.setBrightness(50); // Sätt ljusstyrkan (0-255)
   bomServo.attach(SERVO_PIN);
-  pinMode(seekPin1, INPUT);
-  pinMode(seekPin2, INPUT);
+  pinMode(seekPin1, INPUT_PULLUP);
+  pinMode(seekPin2, INPUT_PULLUP);
   u8g2.begin();
   u8g2.setFont(u8g2_font_ncenB08_tr);
   bomServo.write(CLOSED_ANGLE);

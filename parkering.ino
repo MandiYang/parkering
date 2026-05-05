@@ -77,7 +77,7 @@ void loop() {
   sensorIN = digitalRead(seekPin1);
   sensorOUT = digitalRead(seekPin2);
   direction = checkMovement(sensorIN, sensorOUT);
-  
+  /*
   Serial.print(sensorIN);
   Serial.print("   ");
   Serial.print(sensorOUT);
@@ -85,7 +85,7 @@ void loop() {
   Serial.print(direction);
   Serial.print("   ");
   Serial.println(ledigaPlatser);
-  
+  */
   updateLedigaplatser();
   bomAction();
   webServer();

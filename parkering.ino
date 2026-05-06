@@ -14,7 +14,7 @@ ArduinoLEDMatrix matrix;
 const int seekPin1 = 5;
 const int seekPin2 = 3;
 
-const int maxPlatser = 6;
+const int maxPlatser = 4;
 int ledigaPlatser = maxPlatser;
 int direction;
 int sensorIN;
@@ -224,6 +224,16 @@ void updateMatrix() {
   matrix.renderBitmap(frame, 8, 12);
 }
 
+void buzzerWarning() {
+  /*
+  digitalWrite(BUZZER_PIN, HIGH);
+
+  delay(500);
+
+  digitalWrite(BUZZER_PIN, LOW);
+  */
+}
+
 void printWifiStatus() {
   // print the SSID of the network you're attached to:
   Serial.print("SSID: ");
@@ -267,27 +277,30 @@ void webServer() {
 
             // the content of the HTTP response follows the header:
             // FIXED
-            String htmlContent;
+            String cssAndHeader = "<html><head>"
+                "<meta charset='UTF-8'>"
+                "<meta http-equiv='refresh' content='3'>"
+                "<style>"
+                "body { font-family: Arial, sans-serif; text-align: center; background-color: #f0f0f0; }"
+                "h1 { color: #333; }"
+                ".full { color: red; font-size: 2em; font-weight: bold; }"
+                ".ledigt { color: green; font-size: 2em; }"
+                ".info { color: #666; }"
+                "</style>"
+                "</head><body>"
+                "<h1>Parkeringsplatser</h1>"
+                "<p class='info'>Max antal platser: " + String(maxPlatser) + "</p>";
+
+            String statusMsg;
             if (ledigaPlatser <= 0) {
-              htmlContent = "<html><head>"
-                  "<meta charset='UTF-8'>"
-                  "<meta http-equiv='refresh' content='3'>"
-                  "</head><body>"
-                  "<h1>Parkeringsplatser</h1>"
-                  "<p>Max antal platser: " + String(maxPlatser) + "</p>"
-                  "<p style='color:red;'><b>Parkeringen är full!</b></p>"
-                  "</body></html>";
+                statusMsg = "<p class='full'>Parkeringen är full!</p>";
             } else {
-              htmlContent = "<html><head>"
-                  "<meta charset='UTF-8'>"
-                  "<meta http-equiv='refresh' content='3'>"
-                  "</head><body>"
-                  "<h1>Parkeringsplatser</h1>"
-                  "<p>Max antal platser: " + String(maxPlatser) + "</p>"
-                  "<p style='color:green;'>Lediga platser: " + String(ledigaPlatser) + "</p>"
-                  "</body></html>";
+                statusMsg = "<p class='ledigt'>Lediga platser: " + String(ledigaPlatser) + "</p>";
             }
-            client.print(htmlContent);
+
+            client.print(cssAndHeader);
+            client.print(statusMsg);
+            client.println("</body></html>");
             
             
             // The HTTP response ends with another blank line:

@@ -4,15 +4,16 @@
 #include "WiFiS3.h"
 #include "Arduino_LED_Matrix.h"
 #include "arduino_secrets.h" 
-#define PIN        9
+//NEOPIXEL
+#define PIN        8
 #define NUMPIXELS 24
 
 Adafruit_NeoPixel pixels(NUMPIXELS, PIN, NEO_GRB + NEO_KHZ800);
 U8G2_SSD1306_128X64_NONAME_1_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE);
 ArduinoLEDMatrix matrix;
 
-const int seekPin1 = 5;
-const int seekPin2 = 3;
+const int seekPin1 = 4;
+const int seekPin2 = 2;
 
 const int maxPlatser = 4;
 int ledigaPlatser = maxPlatser;
@@ -20,19 +21,29 @@ int direction;
 int sensorIN;
 int sensorOUT;
 const int SERVO_PIN = 6;
+//Buzzer
+const int BUZZER_PIN=12;
+bool buzzerActive = false;
+unsigned long buzzerStart = 0;
+
+const int BUZZER_DURATION = 800; // ms
 
 //Servobom
 const int OPEN_ANGLE = 0;
 const int CLOSED_ANGLE = 90;
 const int GATE_OPEN_TIME = 3000;
-int GATE_TEMP_TIME = 0;
+unsigned long GATE_TEMP_TIME = 0;
 bool bomArOppen = false;
 Servo bomServo;
+int currentGateAngle = CLOSED_ANGLE;
 
 //Wifi server
 char ssid[] = SECRET_SSID;        // your network SSID (name)
 char pass[] = SECRET_PASS;    // your network password (use for WPA, or use as key for WEP)
 int keyIndex = 0;                 // your network key index number (needed only for WEP)
+
+//Checkmovement stuff
+static int checkState = 0;
 
 int led =  10;
 int status = WL_IDLE_STATUS;
@@ -49,10 +60,12 @@ void setup() {
   pinMode(seekPin2, INPUT_PULLUP);
   u8g2.begin();
   u8g2.setFont(u8g2_font_ncenB08_tr);
-  bomServo.write(CLOSED_ANGLE);
+  setGateAngle(CLOSED_ANGLE);
   oledWrite(displayMsg);
   updateLights();
   updateMatrix();
+  pinMode(BUZZER_PIN, OUTPUT);
+  digitalWrite(BUZZER_PIN, LOW);
   // check for the WiFi module:
   if (WiFi.status() == WL_NO_MODULE) {
     Serial.println("Communication with WiFi module failed!");
@@ -89,43 +102,46 @@ void loop() {
   updateLedigaplatser();
   bomAction();
   webServer();
+  // Måste alltid köras
+  updateBuzzer();
 }
 
 // Returnerar: 0 = Ingen rörelse, 1 = IN, 2 = UT
 int checkMovement(int seekIN, int seekOUT) {
-  static int state = 0;
   static unsigned long lastChange = 0;
   int result = 0;
 
-  // SÄKERHET: Nollställ om sensorerna är blockerade för länge (t.ex. 60 sekunder)
+  // SÄKERHET: Nollställ om sensorerna är blockerade för länge (t.ex. 30 sekunder)
   if (seekIN == LOW || seekOUT == LOW) {
-    if (millis() - lastChange > 60000) {
-      state = 0;
+    if (millis() - lastChange > 30000) {
+      checkState = 0;
     }
   } else {
     lastChange = millis();
   }
 
   // 1. Vänta på start-trigger (endast en sensor täckt i taget för att undvika felstart)
-  if (state == 0) {
-    if (seekIN == LOW && seekOUT == HIGH) { state = 1; }  // Bil startar IN
+  if (checkState == 0) {
+    if (seekIN == LOW && seekOUT == HIGH) { 
+      checkState = 1; 
+    }  // Bil startar IN
     else if (seekOUT == LOW && seekIN == HIGH) {
-      state = 2;
+      checkState = 2;
     }  // Bil startar UT
   }
 
   // 2. Logik för att fullfölja passagen
-  if (state == 1 && seekOUT == LOW) {
+  if (checkState == 1 && seekOUT == LOW) {
     result = 1;  // IN-passagen bekräftad
-    state = 3;   // Lås tills sensorerna är fria
-  } else if (state == 2 && seekIN == LOW) {
+    checkState = 3;   // Lås tills sensorerna är fria
+  } else if (checkState == 2 && seekIN == LOW) {
     result = 2;  // UT-passagen bekräftad
-    state = 3;   // Lås tills sensorerna är fria
+    checkState = 3;   // Lås tills sensorerna är fria
   }
 
   // 3. Lås tillstånd tills båda sensorerna är fria igen
-  if (state == 3 && seekIN == HIGH && seekOUT == HIGH) {
-    state = 0;
+  if (checkState == 3 && seekIN == HIGH && seekOUT == HIGH) {
+    checkState = 0;
   }
   return result;
 }
@@ -137,12 +153,17 @@ void updateLedigaplatser() {
     oledWrite(displayMsg);
     updateMatrix();
     updateLights();
+    direction = 0;
   } else if ((direction == 2) && (ledigaPlatser < maxPlatser)) {  // UT
     ledigaPlatser++;
     displayMsg = "Lediga platser: " + String(ledigaPlatser);
     oledWrite(displayMsg);
     updateMatrix();
     updateLights();
+    direction = 0;
+  }
+  else{
+    return;
   }
 }
 
@@ -153,29 +174,47 @@ void oledWrite(String text) {
   } while (u8g2.nextPage());
 }
 
+void setGateAngle(int angle) {
+  if (currentGateAngle != angle) {
+    bomServo.write(angle);
+    currentGateAngle = angle;
+  }
+}
+
+void openGate(){
+  setGateAngle(OPEN_ANGLE);
+  bomArOppen = true;
+  GATE_TEMP_TIME = millis();
+}
+
+void closeGate(){
+  setGateAngle(CLOSED_ANGLE);
+  bomArOppen = false;
+}
+
 void bomAction() {
   if (sensorIN == 0 && ledigaPlatser > 0) {  // Bil kör in
-    GATE_TEMP_TIME = millis();
-    bomServo.write(OPEN_ANGLE);
-    bomArOppen = true;
-  } else if (sensorOUT == 0) {  // Bil kör ut
-    GATE_TEMP_TIME = millis();
-    bomServo.write(OPEN_ANGLE);
-    bomArOppen = true;
+    openGate();
+  } 
+  else if (sensorIN == 0 && ledigaPlatser <= 0) { // Bil kör in men inga lediga platser
+    triggerBuzzerWarning();
+    checkState=0;
+  }
+  else if (sensorOUT == 0) {  // Bil kör ut
+    openGate();
   }
 
   if ((millis() - GATE_TEMP_TIME) > GATE_OPEN_TIME && sensorIN == HIGH && sensorOUT == HIGH) {
-    bomServo.write(CLOSED_ANGLE);
-    bomArOppen = false;
+    closeGate();
   }
 
   // --- 2. SMART-STÄNGNING ---
   // Om bommen är öppen, stäng den först när båda sensorerna är fria (HIGH)
   /*if (bomArOppen && sensorIN == HIGH && sensorOUT == HIGH) {
-    state = false if (sensorIN == LOW || sensorOUT == LOW) {
-      state = !state
+    checkState = false if (sensorIN == LOW || sensorOUT == LOW) {
+      checkState = !checkState
     }
-    if (state) {
+    if (checkState) {
       bomServo.write(CLOSED_ANGLE);
     }
     bomArOppen = false;
@@ -186,7 +225,11 @@ void bomAction() {
 void updateLights() {
   if (ledigaPlatser <= 0) {
     setAllPixels(pixels.Color(255, 0, 0)); // RÖTT - Fullt
-  } else {
+  } 
+  else if (ledigaPlatser <= (maxPlatser/2)) {
+    setAllPixels(pixels.Color(255, 255, 0)); // GULT - Lite ledig platser kvar
+  } 
+  else {
     setAllPixels(pixels.Color(0, 255, 0)); // GRÖNT - Ledigt
   }
   /*
@@ -224,14 +267,19 @@ void updateMatrix() {
   matrix.renderBitmap(frame, 8, 12);
 }
 
-void buzzerWarning() {
-  /*
-  digitalWrite(BUZZER_PIN, HIGH);
+void triggerBuzzerWarning() {
+  if (!buzzerActive) {
+    buzzerActive = true;
+    buzzerStart = millis();
+    tone(BUZZER_PIN, 2000); // 2000 Hz
+  }
+}
 
-  delay(500);
-
-  digitalWrite(BUZZER_PIN, LOW);
-  */
+void updateBuzzer() {
+  if (buzzerActive && millis() - buzzerStart > BUZZER_DURATION) {
+    noTone(BUZZER_PIN);
+    buzzerActive = false;
+  }
 }
 
 void printWifiStatus() {

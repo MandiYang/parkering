@@ -4,6 +4,7 @@
 #include "WiFiS3.h"
 #include "Arduino_LED_Matrix.h"
 #include "arduino_secrets.h" 
+#include "webpage.h"
 //NEOPIXEL
 #define PIN        8
 #define NUMPIXELS 24
@@ -302,6 +303,29 @@ void printWifiStatus() {
   Serial.println(ip);
 }
 
+String generateHTML() {
+
+  String html = webpage;
+
+  html.replace("%MAX%", String(maxPlatser));
+
+  String statusMsg;
+
+  if (ledigaPlatser <= 0) {
+    statusMsg = "<p class='full'>Parkeringen är full!</p>";
+  }
+  else if (ledigaPlatser <= (maxPlatser / 2)) {
+    statusMsg = "<p class='warning'>Få platser kvar: " + String(ledigaPlatser) + "</p>";
+  }
+  else {
+    statusMsg = "<p class='ledigt'>Lediga platser: " + String(ledigaPlatser) + "</p>";
+  }
+
+  html.replace("%STATUS%", statusMsg);
+
+  return html;
+}
+
 void webServer() {
   WiFiClient client = server.available();   // listen for incoming clients
 
@@ -324,32 +348,8 @@ void webServer() {
             client.println();
 
             // the content of the HTTP response follows the header:
-            // FIXED
-            String cssAndHeader = "<html><head>"
-                "<meta charset='UTF-8'>"
-                "<meta http-equiv='refresh' content='3'>"
-                "<style>"
-                "body { font-family: Arial, sans-serif; text-align: center; background-color: #f0f0f0; }"
-                "h1 { color: #333; }"
-                ".full { color: red; font-size: 2em; font-weight: bold; }"
-                ".ledigt { color: green; font-size: 2em; }"
-                ".info { color: #666; }"
-                "</style>"
-                "</head><body>"
-                "<h1>Parkeringsplatser</h1>"
-                "<p class='info'>Max antal platser: " + String(maxPlatser) + "</p>";
 
-            String statusMsg;
-            if (ledigaPlatser <= 0) {
-                statusMsg = "<p class='full'>Parkeringen är full!</p>";
-            } else {
-                statusMsg = "<p class='ledigt'>Lediga platser: " + String(ledigaPlatser) + "</p>";
-            }
-
-            client.print(cssAndHeader);
-            client.print(statusMsg);
-            client.println("</body></html>");
-            
+            client.print(generateHTML()); 
             
             // The HTTP response ends with another blank line:
             client.println();

@@ -223,16 +223,38 @@ void bomAction() {
 }
 
 // Funktion för att styra färg baserat på lediga platser
+uint32_t lerpColor(uint8_t r1, uint8_t g1, uint8_t b1, uint8_t r2, uint8_t g2, uint8_t b2, float t) {
+  t = constrain(t, 0.0, 1.0);
+
+  uint8_t r = r1 + (r2 - r1) * t;
+  uint8_t g = g1 + (g2 - g1) * t;
+  uint8_t b = b1 + (b2 - b1) * t;
+
+  return pixels.Color(r, g, b);
+}
+
 void updateLights() {
-  if (ledigaPlatser <= 0) {
-    setAllPixels(pixels.Color(255, 0, 0)); // RÖTT - Fullt
-  } 
-  else if (ledigaPlatser <= (maxPlatser/2)) {
-    setAllPixels(pixels.Color(255, 255, 0)); // GULT - Lite lediga platser kvar
-  } 
-  else {
-    setAllPixels(pixels.Color(0, 255, 0)); // GRÖNT - Ledigt
+  float fillLevel = (float)(maxPlatser - ledigaPlatser) / maxPlatser;
+  fillLevel = constrain(fillLevel, 0.0, 1.0);
+
+  uint32_t color;
+
+  if (fillLevel < 0.5) {
+    // Grön - Gul
+    float t = fillLevel * 2.0; // 0 → 1
+    color = lerpColor(0, 255, 0,   255, 255, 0, t);
+
+  } else {
+    // Gul -> Röd
+    float t = (fillLevel - 0.5) * 2.0; // 0 → 1
+    color = lerpColor(255, 255, 0,   255, 0, 0, t);
   }
+
+  for (int i = 0; i < NUMPIXELS; i++) {
+    pixels.setPixelColor(i, color);
+  }
+
+  pixels.show();
 }
 
 // Hjälpfunktion för att sätta färg på alla pixlar

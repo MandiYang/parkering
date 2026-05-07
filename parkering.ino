@@ -194,14 +194,14 @@ void closeGate(){
 }
 
 void bomAction() {
-  if (sensorIN == 0 && ledigaPlatser > 0) {  // Bil kör in
+  if (sensorIN == LOW && ledigaPlatser > 0) {  // Bil kör in
     openGate();
   } 
-  else if (sensorIN == 0 && ledigaPlatser <= 0) { // Bil kör in men inga lediga platser
+  else if (sensorIN == LOW && ledigaPlatser <= 0) { // Bil kör in men inga lediga platser
     triggerBuzzerWarning();
     checkState=0;
   }
-  else if (sensorOUT == 0) {  // Bil kör ut
+  else if (sensorOUT == LOW) {  // Bil kör ut
     openGate();
   }
 

@@ -228,19 +228,11 @@ void updateLights() {
     setAllPixels(pixels.Color(255, 0, 0)); // RÖTT - Fullt
   } 
   else if (ledigaPlatser <= (maxPlatser/2)) {
-    setAllPixels(pixels.Color(255, 255, 0)); // GULT - Lite ledig platser kvar
+    setAllPixels(pixels.Color(255, 255, 0)); // GULT - Lite lediga platser kvar
   } 
   else {
     setAllPixels(pixels.Color(0, 255, 0)); // GRÖNT - Ledigt
   }
-  /*
-  if (bomArOppen) {
-    setAllPixels(pixels.Color(255, 165, 0)); // GULT - Bom öppen
-  } else if (ledigaPlatser <= 0) {
-    setAllPixels(pixels.Color(255, 0, 0)); // RÖTT - Fullt
-  } else {
-    setAllPixels(pixels.Color(0, 255, 0)); // GRÖNT - Ledigt
-  }*/
 }
 
 // Hjälpfunktion för att sätta färg på alla pixlar

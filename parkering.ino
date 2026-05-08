@@ -1,3 +1,12 @@
+/*
+* Name: Parking System
+* Author: Mandi Yang
+* Date: 2026-05-08
+* Description:
+* This project is a parking system that uses a servo gate,
+* OLED screen, NeoPixels, LED matrix, buzzer and Arduino
+* WiFi library to operate as a complete smart parking solution.
+*/
 #include <U8g2lib.h>
 #include <Servo.h>
 #include <Adafruit_NeoPixel.h>
@@ -38,7 +47,7 @@ bool bomArOppen = false;
 Servo bomServo;
 int currentGateAngle = CLOSED_ANGLE;
 
-//Wifi server
+//Wifi server, passwords and network info comes from a separate file for security measures
 char ssid[] = SECRET_SSID;        // your network SSID (name)
 char pass[] = SECRET_PASS;    // your network password (use for WPA, or use as key for WEP)
 int keyIndex = 0;                 // your network key index number (needed only for WEP)
@@ -46,7 +55,6 @@ int keyIndex = 0;                 // your network key index number (needed only 
 //Checkmovement stuff
 static int checkState = 0;
 
-int led =  10;
 int status = WL_IDLE_STATUS;
 WiFiServer server(80);
 String displayMsg="Lediga platser: " + String(ledigaPlatser);
@@ -90,10 +98,11 @@ void setup() {
 }
 
 void loop() {
-  sensorIN = digitalRead(seekPin1);
+  //Reading sensor values in the loop
+  sensorIN = digitalRead(seekPin1);  
   sensorOUT = digitalRead(seekPin2);
   direction = checkMovement(sensorIN, sensorOUT);
-  /*
+  /* Debugging stuff
   Serial.print(sensorIN);
   Serial.print("   ");
   Serial.print(sensorOUT);
@@ -105,11 +114,14 @@ void loop() {
   updateLedigaplatser();
   bomAction();
   webServer();
-  // Måste alltid köras
   updateBuzzer();
 }
 
-// Returnerar: 0 = Ingen rörelse, 1 = IN, 2 = UT
+/*
+*This function checks the direction an object is heading through the gate the function returns 0 = No movement, 1 = IN, 2 = UT
+*Parameters: int seekIN, int seekOUT
+*Returns: int
+*/
 int checkMovement(int seekIN, int seekOUT) {
   static unsigned long lastChange = 0;
   int result = 0;
@@ -149,6 +161,12 @@ int checkMovement(int seekIN, int seekOUT) {
   return result;
 }
 
+/*
+*This function updates the number of available parking spaces depending on vehicle direction
+*It also updates the OLED display, LED matrix and NeoPixel indicators
+*Parameters: None
+*Returns: None
+*/
 void updateLedigaplatser() {
   if ((direction == 1) && (ledigaPlatser > 0)) {  // IN
     ledigaPlatser--;
@@ -172,6 +190,11 @@ void updateLedigaplatser() {
   }
 }
 
+/*
+*This function writes two lines of text to the OLED screen
+*Parameters: String text1, String text2
+*Returns: None
+*/
 void oledWrite(String text1, String text2) {
   u8g2.firstPage();
   do {
@@ -180,6 +203,11 @@ void oledWrite(String text1, String text2) {
   } while (u8g2.nextPage());
 }
 
+/*
+*This function sets the servo gate angle only if the angle has changed
+*Parameters: int angle
+*Returns: None
+*/
 void setGateAngle(int angle) {
   if (currentGateAngle != angle) {
     bomServo.write(angle);
@@ -187,17 +215,32 @@ void setGateAngle(int angle) {
   }
 }
 
+/*
+*This function opens the gate and starts the gate timer
+*Parameters: None
+*Returns: None
+*/
 void openGate(){
   setGateAngle(OPEN_ANGLE);
   bomArOppen = true;
   GATE_TEMP_TIME = millis();
 }
 
+/*
+*This function closes the gate
+*Parameters: None
+*Returns: None
+*/
 void closeGate(){
   setGateAngle(CLOSED_ANGLE);
   bomArOppen = false;
 }
 
+/*
+*This function controls the gate logic depending on sensor input and parking availability
+*Parameters: None
+*Returns: None
+*/
 void bomAction() {
   if (sensorIN == LOW && ledigaPlatser > 0) {  // Bil kör in
     openGate();
@@ -227,7 +270,11 @@ void bomAction() {
   }*/
 }
 
-// Funktion för att styra färg baserat på lediga platser
+/*
+*This function interpolates between two RGB colors and returns the resulting color
+*Parameters: uint8_t r1, uint8_t g1, uint8_t b1, uint8_t r2, uint8_t g2, uint8_t b2, float t
+*Returns: uint32_t
+*/
 uint32_t lerpColor(uint8_t r1, uint8_t g1, uint8_t b1, uint8_t r2, uint8_t g2, uint8_t b2, float t) {
   t = constrain(t, 0.0, 1.0);
 
@@ -238,6 +285,11 @@ uint32_t lerpColor(uint8_t r1, uint8_t g1, uint8_t b1, uint8_t r2, uint8_t g2, u
   return pixels.Color(r, g, b);
 }
 
+/*
+*This function updates the NeoPixel colors depending on parking occupancy
+*Parameters: None
+*Returns: None
+*/
 void updateLights() {
   float fillLevel = (float)(maxPlatser - ledigaPlatser) / maxPlatser;
   fillLevel = constrain(fillLevel, 0.0, 1.0);
@@ -262,15 +314,11 @@ void updateLights() {
   pixels.show();
 }
 
-// Hjälpfunktion för att sätta färg på alla pixlar
-void setAllPixels(uint32_t color) {
-  for(int i=0; i<NUMPIXELS; i++) {
-    pixels.setPixelColor(i, color);
-  }
-  pixels.show();
-}
-
-// Funktion som ritar en pixel per ledig plats på den inbyggda matrisen
+/*
+*This function updates the LED matrix visualization based on the number of occupied parking spaces
+*Parameters: None
+*Returns: None
+*/
 void updateMatrix() {
   // Matrisen på R4 är 8 rader hög och 12 kolumner bred
   uint8_t frame[8][12] = {0}; 
@@ -287,6 +335,11 @@ void updateMatrix() {
   matrix.renderBitmap(frame, 8, 12);
 }
 
+/*
+*This function activates the buzzer warning sound if it is not already active
+*Parameters: None
+*Returns: None
+*/
 void triggerBuzzerWarning() {
   if (!buzzerActive) {
     buzzerActive = true;
@@ -295,6 +348,11 @@ void triggerBuzzerWarning() {
   }
 }
 
+/*
+*This function turns off the buzzer after the warning duration has passed
+*Parameters: None
+*Returns: None
+*/
 void updateBuzzer() {
   if (buzzerActive && millis() - buzzerStart > BUZZER_DURATION) {
     noTone(BUZZER_PIN);
@@ -302,6 +360,11 @@ void updateBuzzer() {
   }
 }
 
+/*
+*This function prints WiFi connection information to the serial monitor
+*Parameters: None
+*Returns: None
+*/
 void printWifiStatus() {
   // print the SSID of the network you're attached to:
   Serial.print("SSID: ");
@@ -322,6 +385,11 @@ void printWifiStatus() {
   Serial.println(ip);
 }
 
+/*
+*This function generates the HTML webpage with updated parking information by reading the webpage variable from webpage.h
+*Parameters: None
+*Returns: String
+*/
 String generateHTML() {
 
   String html = webpage;
@@ -345,6 +413,11 @@ String generateHTML() {
   return html;
 }
 
+/*
+*This function handles incoming HTTP clients and serves the parking webpage
+*Parameters: None
+*Returns: None
+*/
 void webServer() {
   WiFiClient client = server.available();   // listen for incoming clients
 

@@ -50,19 +50,18 @@ int led =  10;
 int status = WL_IDLE_STATUS;
 WiFiServer server(80);
 String displayMsg="Lediga platser: " + String(ledigaPlatser);
+String displayMsg2="Max platser: " + String(maxPlatser);
 
 void setup() {
   Serial.begin(9600);
   matrix.begin();
   pixels.begin();
   pixels.setBrightness(50); // Sätt ljusstyrkan (0-255)
-  bomServo.attach(SERVO_PIN);
   pinMode(seekPin1, INPUT_PULLUP);
   pinMode(seekPin2, INPUT_PULLUP);
   u8g2.begin();
   u8g2.setFont(u8g2_font_ncenB08_tr);
-  setGateAngle(CLOSED_ANGLE);
-  oledWrite(displayMsg);
+  oledWrite(displayMsg, displayMsg2);
   updateLights();
   updateMatrix();
   pinMode(BUZZER_PIN, OUTPUT);
@@ -80,11 +79,14 @@ void setup() {
 
     // Connect to WPA/WPA2 network. Change this line if using open or WEP network:
     status = WiFi.begin(ssid, pass);
-    // wait 6 seconds for connection:
-    delay(6000);
+    // wait 5 seconds for connection:
+    delay(5000);
   }
   server.begin();    // start the web server on port 80
   printWifiStatus(); // you're connected now, so print out the status
+  bomServo.attach(SERVO_PIN);
+  delay(500);
+  setGateAngle(CLOSED_ANGLE);
 }
 
 void loop() {
@@ -151,14 +153,16 @@ void updateLedigaplatser() {
   if ((direction == 1) && (ledigaPlatser > 0)) {  // IN
     ledigaPlatser--;
     displayMsg = "Lediga platser: " + String(ledigaPlatser);
-    oledWrite(displayMsg);
+    displayMsg2 = "Max platser: " + String(maxPlatser);
+    oledWrite(displayMsg, displayMsg2);
     updateMatrix();
     updateLights();
     direction = 0;
   } else if ((direction == 2) && (ledigaPlatser < maxPlatser)) {  // UT
     ledigaPlatser++;
     displayMsg = "Lediga platser: " + String(ledigaPlatser);
-    oledWrite(displayMsg);
+    displayMsg2 = "Max platser: " + String(maxPlatser);
+    oledWrite(displayMsg, displayMsg2);
     updateMatrix();
     updateLights();
     direction = 0;
@@ -168,10 +172,11 @@ void updateLedigaplatser() {
   }
 }
 
-void oledWrite(String text) {
+void oledWrite(String text1, String text2) {
   u8g2.firstPage();
   do {
-    u8g2.drawStr(5, 45, text.c_str());
+    u8g2.drawStr(5, 45, text1.c_str());
+    u8g2.drawStr(5, 30, text2.c_str());
   } while (u8g2.nextPage());
 }
 
@@ -273,7 +278,7 @@ void updateMatrix() {
   int tanda = 0;
   for (int r = 0; r < 8; r++) {
     for (int c = 0; c < 12; c++) {
-      if (tanda < ledigaPlatser) {
+      if (tanda < (maxPlatser-ledigaPlatser)) {
         frame[r][c] = 1; // Tänd denna pixel
         tanda++;
       }

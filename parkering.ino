@@ -52,7 +52,7 @@ char ssid[] = SECRET_SSID;        // your network SSID (name)
 char pass[] = SECRET_PASS;    // your network password (use for WPA, or use as key for WEP)
 int keyIndex = 0;                 // your network key index number (needed only for WEP)
 
-//Checkmovement stuff
+//Checkmovement state: 0 -> IDLE, 1 -> Entering, 2 -> Exiting, 3 -> Locking in state
 static int checkState = 0;
 
 int status = WL_IDLE_STATUS;
@@ -124,7 +124,7 @@ void loop() {
 */
 int checkMovement(int seekIN, int seekOUT) {
   static unsigned long lastChange = 0;
-  int result = 0;
+  int result = 0; // Return the movement value in the end of function
 
   // SÄKERHET: Nollställ om sensorerna är blockerade för länge (t.ex. 30 sekunder)
   if (seekIN == LOW || seekOUT == LOW) {
